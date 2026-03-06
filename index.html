@@ -790,4 +790,228 @@
     localStorage.setItem(PASSWORD_KEY, nuova);
     document.getElementById('nuova-password').value = '';
     document.getElementById('conferma-password').value = '';
-    msg.style.color = 'var
+    msg.style.color = 'var(--green-light)';
+    msg.textContent = 'Password aggiornata con successo!';
+    setTimeout(() => msg.textContent = '', 3000);
+  }
+
+  // ---- STATO ----
+  function getStato() {
+    return localStorage.getItem(STATO_KEY) || 'auto';
+  }
+
+  function isFormAperto() {
+    const stato = getStato();
+    if (stato === 'aperto') return true;
+    if (stato === 'chiuso') return false;
+    // AUTO: aperto merc-giovedì entro le 16:00
+    const now = new Date();
+    const giorno = now.getDay(); // 0=dom,1=lun,...,3=mer,4=gio
+    const ora = now.getHours() + now.getMinutes() / 60;
+    return (giorno === 3 || (giorno === 4 && ora < 16));
+  }
+
+  function setStato(s) {
+    localStorage.setItem(STATO_KEY, s);
+    aggiornaStatoUI();
+  }
+
+  function aggiornaStatoUI() {
+    const s = getStato();
+    const aperto = isFormAperto();
+    document.getElementById('stato-label').textContent = aperto ? '🟢 Aperto' : '🔴 Chiuso';
+    document.getElementById('btn-apri').className = 'toggle-btn' + (s === 'aperto' ? ' active-open' : '');
+    document.getElementById('btn-chiudi').className = 'toggle-btn' + (s === 'chiuso' ? ' active-closed' : '');
+    document.getElementById('btn-auto').className = 'toggle-btn' + (s === 'auto' ? ' active-open' : '');
+  }
+
+  // ---- SETTIMANA ----
+  function getNextWeekLabel() {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysUntilMonday = (dayOfWeek === 0) ? 1 : (8 - dayOfWeek);
+    const nextMon = new Date(now);
+    nextMon.setDate(now.getDate() + daysUntilMonday);
+    const nextSun = new Date(nextMon);
+    nextSun.setDate(nextMon.getDate() + 6);
+    const fmt = (d) => d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+    return `Settimana ${fmt(nextMon)} – ${fmt(nextSun)}`;
+  }
+
+  // ---- BUILD FORM ----
+  function buildGiorniForm() {
+    const grid = document.getElementById('giorni-grid');
+    grid.innerHTML = '';
+    GIORNI.forEach((g, i) => {
+      const gDisplay = GIORNI_DISPLAY[i];
+      grid.innerHTML += `
+        <div class="giorno-row" id="row-${i}" onclick="toggleGiorno(${i})">
+          <div class="giorno-header">
+            <div class="giorno-check" id="check-${i}"></div>
+            <span class="giorno-nome">${gDisplay}</span>
+            <span class="giorno-badge" id="badge-${i}">non disponibile</span>
+          </div>
+          <div class="giorno-orario" id="orario-${i}" onclick="event.stopPropagation()">
+            <label>Orario di disponibilita</label>
+            <input type="text" id="orario-input-${i}" placeholder="es. 06:30 - 15:00" />
+            <p class="orario-hint">Scrivi liberamente l'orario o le note per questo giorno.</p>
+          </div>
+        </div>`;
+    });
+  }
+
+  function toggleGiorno(i) {
+    const row = document.getElementById(`row-${i}`);
+    const badge = document.getElementById(`badge-${i}`);
+    const check = document.getElementById(`check-${i}`);
+    const active = row.classList.toggle('attivo');
+    badge.textContent = active ? 'disponibile' : 'non disponibile';
+    check.textContent = active ? '✓' : '';
+    if (active) document.getElementById(`orario-input-${i}`).focus();
+  }
+
+  // ---- DATI ----
+  function getDati() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function salvaDato(entry) {
+    const dati = getDati();
+    dati.push(entry);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dati));
+  }
+
+  // ---- INVIA ----
+  async function inviaDisponibilita() {
+    const nome = document.getElementById('nome-input').value.trim();
+    if (!nome) { alert('Per favore inserisci il tuo nome e cognome.'); return; }
+
+    const disponibilita = {};
+    let almeno = false;
+    GIORNI.forEach((g, i) => {
+      if (document.getElementById(`row-${i}`).classList.contains('attivo')) {
+        const orario = document.getElementById(`orario-input-${i}`).value.trim() || '-';
+        disponibilita[g] = orario;
+        almeno = true;
+      }
+    });
+
+    if (!almeno) { alert('Seleziona almeno un giorno disponibile.'); return; }
+
+    const entry = {
+      nome,
+      disponibilita,
+      timestamp: new Date().toLocaleString('it-IT')
+    };
+
+    const btn = document.getElementById('submit-btn');
+    const syncStatus = document.getElementById('sync-status');
+    btn.disabled = true;
+    btn.textContent = 'Invio in corso...';
+    syncStatus.textContent = '';
+    syncStatus.className = 'sync-status';
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      document.getElementById('nome-confirm').textContent = nome;
+      document.getElementById('form-screen').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'flex';
+    } catch (err) {
+      syncStatus.textContent = 'Errore di connessione. Riprova.';
+      syncStatus.className = 'sync-status err';
+      btn.disabled = false;
+      btn.textContent = 'Invia disponibilita ->';
+    }
+  }
+
+  // ---- ADMIN ----
+  function mostraAdmin() {
+    document.getElementById('form-screen').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('closed-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    aggiornaTabella();
+    aggiornaStatoUI();
+  }
+
+  function tornaForm() {
+    document.getElementById('admin-panel').style.display = 'none';
+    init();
+  }
+
+  function aggiornaTabella() {
+    const dati = getDati();
+    const body = document.getElementById('tabella-body');
+    document.getElementById('stat-totale').textContent = dati.length;
+
+    const countGiorno = (g) => dati.filter(d => d.disponibilita[g]).length;
+    document.getElementById('stat-lun').textContent = countGiorno('Lunedi');
+    document.getElementById('stat-sab').textContent = countGiorno('Sabato');
+    document.getElementById('stat-dom').textContent = countGiorno('Domenica');
+
+    if (!dati.length) {
+      body.innerHTML = '<tr><td colspan="9" class="empty-state">Nessuna disponibilita ricevuta ancora.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = dati.map(d => {
+      const celle = GIORNI.map(g => {
+        const o = d.disponibilita[g];
+        return `<td>${o ? `<span class="orario-tag">${o}</span>` : '<span class="no-data">-</span>'}</td>`;
+      }).join('');
+      return `<tr><td>${d.nome}</td>${celle}<td style="color:var(--text-muted);font-size:0.75rem">${d.timestamp}</td></tr>`;
+    }).join('');
+  }
+
+  function svuotaDati() {
+    if (!confirm('Sei sicuro? Verranno cancellate tutte le disponibilità ricevute.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    aggiornaTabella();
+  }
+
+  // ---- EXPORT EXCEL ----
+  function esportaExcel() {
+    const dati = getDati();
+    if (!dati.length) { alert('Nessun dato da esportare.'); return; }
+
+    let csv = 'Nome,' + GIORNI.join(',') + ',Inviato\n';
+    dati.forEach(d => {
+      const row = [d.nome, ...GIORNI.map(g => d.disponibilita[g] || ''), d.timestamp];
+      csv += row.map(v => `"${v}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `disponibilita_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---- INIT ----
+  function init() {
+    document.getElementById('week-label').textContent = getNextWeekLabel();
+    document.getElementById('form-screen').style.display = 'none';
+    document.getElementById('closed-screen').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'none';
+
+    if (isFormAperto()) {
+      document.getElementById('form-screen').style.display = 'block';
+      buildGiorniForm();
+    } else {
+      document.getElementById('closed-screen').style.display = 'flex';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
