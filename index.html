@@ -209,16 +209,76 @@
     display: block;
   }
 
-  .giorno-orario input {
-    font-size: 0.92rem;
-    padding: 11px 14px;
+  .orario-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
   }
 
-  .orario-hint {
-    font-size: 0.74rem;
-    color: var(--text-muted);
-    margin-top: 6px;
+  .orario-field {
+    flex: 1;
   }
+
+  .orario-field label {
+    font-size: 0.72rem;
+    margin-bottom: 5px;
+  }
+
+  .time-picker-btn {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem;
+    color: var(--dark);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .time-picker-btn:focus { outline: none; border-color: var(--gold); }
+  .time-picker-btn.selezionato { border-color: var(--gold); color: var(--dark); font-weight: 600; }
+  .time-picker-btn .placeholder { color: var(--text-muted); font-weight: 400; }
+
+  .orario-separatore {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-top: 18px;
+    flex-shrink: 0;
+  }
+
+  /* TIME DROPDOWN */
+  .time-dropdown {
+    display: none;
+    position: fixed;
+    z-index: 300;
+    background: var(--white);
+    border: 1.5px solid var(--gold);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    width: 160px;
+    max-height: 240px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+
+  .time-dropdown.visible { display: block; }
+
+  .time-option {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .time-option:hover { background: var(--cream); }
+  .time-option.selected { background: var(--gold); color: white; font-weight: 600; }
 
   /* SUBMIT */
   .submit-btn {
@@ -610,6 +670,8 @@
 
 <div id="deadline-banner">📅 Le disponibilità vanno inserite entro <strong>giovedì ore 16:00</strong></div>
 
+<div id="dropdowns-container"></div>
+
 <!-- MODAL PASSWORD -->
 <div class="modal-overlay" id="modal-password">
   <div class="modal-box">
@@ -838,10 +900,87 @@
     return `Settimana ${fmt(nextMon)} – ${fmt(nextSun)}`;
   }
 
+  // ---- TIME SLOTS ----
+  function buildTimeSlots() {
+    const slots = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+      }
+    }
+    return slots;
+  }
+  const TIME_SLOTS = buildTimeSlots();
+
+  let activeDropdown = null;
+
+  function apriTimePicker(giornoIdx, tipo, btnEl) {
+    // Chiudi dropdown aperto
+    if (activeDropdown) {
+      activeDropdown.classList.remove('visible');
+      activeDropdown = null;
+    }
+
+    const dropId = `drop-${giornoIdx}-${tipo}`;
+    let drop = document.getElementById(dropId);
+
+    // Posiziona il dropdown vicino al bottone
+    const rect = btnEl.getBoundingClientRect();
+    drop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    drop.style.left = rect.left + 'px';
+    drop.classList.add('visible');
+    activeDropdown = drop;
+
+    // Scrolla al valore selezionato
+    const selected = drop.querySelector('.selected');
+    if (selected) selected.scrollIntoView({ block: 'center' });
+  }
+
+  function selezionaOrario(giornoIdx, tipo, valore) {
+    const btnId = `btn-${giornoIdx}-${tipo}`;
+    const btn = document.getElementById(btnId);
+    btn.innerHTML = `${valore} <span style="font-size:0.7rem">▼</span>`;
+    btn.classList.add('selezionato');
+    btn.dataset.value = valore;
+
+    // Aggiorna selected nel dropdown
+    const dropId = `drop-${giornoIdx}-${tipo}`;
+    const drop = document.getElementById(dropId);
+    drop.querySelectorAll('.time-option').forEach(o => {
+      o.classList.toggle('selected', o.dataset.time === valore);
+    });
+
+    // Chiudi
+    drop.classList.remove('visible');
+    activeDropdown = null;
+  }
+
+  // Chiudi dropdown cliccando fuori
+  document.addEventListener('click', (e) => {
+    if (activeDropdown && !e.target.closest('.time-picker-btn') && !e.target.closest('.time-dropdown')) {
+      activeDropdown.classList.remove('visible');
+      activeDropdown = null;
+    }
+  });
+
   // ---- BUILD FORM ----
   function buildGiorniForm() {
     const grid = document.getElementById('giorni-grid');
     grid.innerHTML = '';
+
+    // Crea i dropdown globali (fuori dal grid per evitare overflow)
+    let dropsHtml = '';
+    GIORNI.forEach((g, i) => {
+      ['inizio','fine'].forEach(tipo => {
+        dropsHtml += `<div class="time-dropdown" id="drop-${i}-${tipo}">`;
+        TIME_SLOTS.forEach(t => {
+          dropsHtml += `<div class="time-option" data-time="${t}" onclick="selezionaOrario(${i},'${tipo}','${t}')">${t}</div>`;
+        });
+        dropsHtml += `</div>`;
+      });
+    });
+    document.getElementById('dropdowns-container').innerHTML = dropsHtml;
+
     GIORNI.forEach((g, i) => {
       const gDisplay = GIORNI_DISPLAY[i];
       grid.innerHTML += `
@@ -852,9 +991,23 @@
             <span class="giorno-badge" id="badge-${i}">non disponibile</span>
           </div>
           <div class="giorno-orario" id="orario-${i}" onclick="event.stopPropagation()">
-            <label>Orario di disponibilita</label>
-            <input type="text" id="orario-input-${i}" placeholder="es. 06:30 - 15:00" />
-            <p class="orario-hint">Scrivi liberamente l'orario o le note per questo giorno.</p>
+            <div class="orario-row">
+              <div class="orario-field">
+                <label>Dalle</label>
+                <button class="time-picker-btn" id="btn-${i}-inizio" data-value=""
+                  onclick="apriTimePicker(${i},'inizio',this)">
+                  <span class="placeholder">Ora inizio</span> <span style="font-size:0.7rem">▼</span>
+                </button>
+              </div>
+              <div class="orario-separatore">→</div>
+              <div class="orario-field">
+                <label>Alle</label>
+                <button class="time-picker-btn" id="btn-${i}-fine" data-value=""
+                  onclick="apriTimePicker(${i},'fine',this)">
+                  <span class="placeholder">Ora fine</span> <span style="font-size:0.7rem">▼</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>`;
     });
@@ -889,15 +1042,23 @@
 
     const disponibilita = {};
     let almeno = false;
+    let erroreOrario = false;
+
     GIORNI.forEach((g, i) => {
       if (document.getElementById(`row-${i}`).classList.contains('attivo')) {
-        const orario = document.getElementById(`orario-input-${i}`).value.trim() || '-';
-        disponibilita[g] = orario;
-        almeno = true;
+        const inizio = document.getElementById(`btn-${i}-inizio`).dataset.value;
+        const fine = document.getElementById(`btn-${i}-fine`).dataset.value;
+        if (!inizio || !fine) {
+          erroreOrario = true;
+        } else {
+          disponibilita[g] = `${inizio} - ${fine}`;
+          almeno = true;
+        }
       }
     });
 
     if (!almeno) { alert('Seleziona almeno un giorno disponibile.'); return; }
+    if (erroreOrario) { alert('Inserisci orario di inizio e fine per tutti i giorni selezionati.'); return; }
 
     const entry = {
       nome,
