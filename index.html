@@ -857,34 +857,49 @@
     setTimeout(() => msg.textContent = '', 3000);
   }
 
-  // ---- STATO ----
-  function getStato() {
-    return localStorage.getItem(STATO_KEY) || 'auto';
+  // ---- STATO (remoto via Google Script) ----
+  let statoCorrente = 'auto';
+
+  async function fetchStato() {
+    try {
+      const res = await fetch(SCRIPT_URL + '?t=' + Date.now());
+      const data = await res.json();
+      statoCorrente = data.stato || 'auto';
+    } catch(e) {
+      statoCorrente = 'auto';
+    }
   }
 
-  function isFormAperto() {
-    const stato = getStato();
+  function isFormApertoConStato(stato) {
     if (stato === 'aperto') return true;
     if (stato === 'chiuso') return false;
-    // AUTO: aperto merc-giovedì entro le 16:00
     const now = new Date();
-    const giorno = now.getDay(); // 0=dom,1=lun,...,3=mer,4=gio
+    const giorno = now.getDay();
     const ora = now.getHours() + now.getMinutes() / 60;
     return (giorno === 3 || (giorno === 4 && ora < 16));
   }
 
-  function setStato(s) {
-    localStorage.setItem(STATO_KEY, s);
-    aggiornaStatoUI();
+  async function setStato(s) {
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'stato', stato: s })
+      });
+      statoCorrente = s;
+      aggiornaStatoUI();
+    } catch(e) {
+      alert('Errore nel salvataggio dello stato. Riprova.');
+    }
   }
 
   function aggiornaStatoUI() {
-    const s = getStato();
-    const aperto = isFormAperto();
+    const aperto = isFormApertoConStato(statoCorrente);
     document.getElementById('stato-label').textContent = aperto ? '🟢 Aperto' : '🔴 Chiuso';
-    document.getElementById('btn-apri').className = 'toggle-btn' + (s === 'aperto' ? ' active-open' : '');
-    document.getElementById('btn-chiudi').className = 'toggle-btn' + (s === 'chiuso' ? ' active-closed' : '');
-    document.getElementById('btn-auto').className = 'toggle-btn' + (s === 'auto' ? ' active-open' : '');
+    document.getElementById('btn-apri').className = 'toggle-btn' + (statoCorrente === 'aperto' ? ' active-open' : '');
+    document.getElementById('btn-chiudi').className = 'toggle-btn' + (statoCorrente === 'chiuso' ? ' active-closed' : '');
+    document.getElementById('btn-auto').className = 'toggle-btn' + (statoCorrente === 'auto' ? ' active-open' : '');
   }
 
   // ---- SETTIMANA ----
@@ -1092,11 +1107,12 @@
   }
 
   // ---- ADMIN ----
-  function mostraAdmin() {
+  async function mostraAdmin() {
     document.getElementById('form-screen').style.display = 'none';
     document.getElementById('success-screen').style.display = 'none';
     document.getElementById('closed-screen').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'block';
+    await fetchStato();
     aggiornaTabella();
     aggiornaStatoUI();
   }
@@ -1157,14 +1173,16 @@
   }
 
   // ---- INIT ----
-  function init() {
+  async function init() {
     document.getElementById('week-label').textContent = getNextWeekLabel();
     document.getElementById('form-screen').style.display = 'none';
     document.getElementById('closed-screen').style.display = 'none';
     document.getElementById('success-screen').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'none';
 
-    if (isFormAperto()) {
+    await fetchStato();
+
+    if (isFormApertoConStato(statoCorrente)) {
       document.getElementById('form-screen').style.display = 'block';
       buildGiorniForm();
     } else {
