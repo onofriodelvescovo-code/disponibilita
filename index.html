@@ -439,14 +439,33 @@
   }
 
   .admin-link button {
-    background: none;
-    border: none;
+    background: var(--white);
+    border: 1.5px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: 0.85rem;
     cursor: pointer;
-    text-decoration: underline;
     font-family: 'DM Sans', sans-serif;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: border-color 0.2s, color 0.2s;
   }
+
+  .admin-link button:hover {
+    border-color: var(--gold);
+    color: var(--dark);
+  }
+
+  .sync-status {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    min-height: 18px;
+    text-align: center;
+  }
+
+  .sync-status.ok { color: var(--green-light); }
+  .sync-status.err { color: var(--red); }
 
   /* DEADLINE TOGGLE */
   .deadline-control {
@@ -534,9 +553,10 @@
   </div>
 
   <button class="submit-btn" id="submit-btn" onclick="inviaDisponibilita()">Invia disponibilità →</button>
+  <div class="sync-status" id="sync-status"></div>
 
   <div class="admin-link">
-    <button onclick="mostraAdmin()">Accesso gestione</button>
+    <button onclick="mostraAdmin()">🔐 Accesso gestione</button>
   </div>
 </div>
 
@@ -606,10 +626,12 @@
 </div>
 
 <script>
-  const GIORNI = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+  const GIORNI = ['Lunedi','Martedi','Mercoledi','Giovedi','Venerdi','Sabato','Domenica'];
+  const GIORNI_DISPLAY = ['Lunedi','Martedi','Mercoledi','Giovedi','Venerdi','Sabato','Domenica'];
   const GIORNI_SHORT = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
   const STORAGE_KEY = 'disponibilita_hotel';
-  const STATO_KEY = 'stato_raccolta'; // 'auto' | 'aperto' | 'chiuso'
+  const STATO_KEY = 'stato_raccolta';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzYX33GpWeWP_10I1k3qfP1wSqPFxsvD27psUyeT_T_Om_zMyfTPyNFPKh8C47YtQkCA/exec';
 
   // ---- STATO ----
   function getStato() {
@@ -659,16 +681,17 @@
     const grid = document.getElementById('giorni-grid');
     grid.innerHTML = '';
     GIORNI.forEach((g, i) => {
+      const gDisplay = GIORNI_DISPLAY[i];
       grid.innerHTML += `
         <div class="giorno-row" id="row-${i}" onclick="toggleGiorno(${i})">
           <div class="giorno-header">
             <div class="giorno-check" id="check-${i}"></div>
-            <span class="giorno-nome">${g}</span>
+            <span class="giorno-nome">${gDisplay}</span>
             <span class="giorno-badge" id="badge-${i}">non disponibile</span>
           </div>
           <div class="giorno-orario" id="orario-${i}" onclick="event.stopPropagation()">
-            <label>Orario di disponibilità</label>
-            <input type="text" id="orario-input-${i}" placeholder="es. 06:30 – 15:00" />
+            <label>Orario di disponibilita</label>
+            <input type="text" id="orario-input-${i}" placeholder="es. 06:30 - 15:00" />
             <p class="orario-hint">Scrivi liberamente l'orario o le note per questo giorno.</p>
           </div>
         </div>`;
@@ -698,7 +721,7 @@
   }
 
   // ---- INVIA ----
-  function inviaDisponibilita() {
+  async function inviaDisponibilita() {
     const nome = document.getElementById('nome-input').value.trim();
     if (!nome) { alert('Per favore inserisci il tuo nome e cognome.'); return; }
 
@@ -706,7 +729,7 @@
     let almeno = false;
     GIORNI.forEach((g, i) => {
       if (document.getElementById(`row-${i}`).classList.contains('attivo')) {
-        const orario = document.getElementById(`orario-input-${i}`).value.trim() || '—';
+        const orario = document.getElementById(`orario-input-${i}`).value.trim() || '-';
         disponibilita[g] = orario;
         almeno = true;
       }
@@ -720,96 +743,33 @@
       timestamp: new Date().toLocaleString('it-IT')
     };
 
-    salvaDato(entry);
+    const btn = document.getElementById('submit-btn');
+    const syncStatus = document.getElementById('sync-status');
+    btn.disabled = true;
+    btn.textContent = 'Invio in corso...';
+    syncStatus.textContent = '';
+    syncStatus.className = 'sync-status';
 
-    document.getElementById('nome-confirm').textContent = nome;
-    document.getElementById('form-screen').style.display = 'none';
-    const s = document.getElementById('success-screen');
-    s.style.display = 'flex';
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      document.getElementById('nome-confirm').textContent = nome;
+      document.getElementById('form-screen').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'flex';
+    } catch (err) {
+      syncStatus.textContent = 'Errore di connessione. Riprova.';
+      syncStatus.className = 'sync-status err';
+      btn.disabled = false;
+      btn.textContent = 'Invia disponibilita ->';
+    }
   }
 
   // ---- ADMIN ----
   function mostraAdmin() {
     document.getElementById('form-screen').style.display = 'none';
     document.getElementById('success-screen').style.display = 'none';
-    document.getElementById('closed-screen').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'block';
-    aggiornaTabella();
-    aggiornaStatoUI();
-  }
-
-  function tornaForm() {
-    document.getElementById('admin-panel').style.display = 'none';
-    init();
-  }
-
-  function aggiornaTabella() {
-    const dati = getDati();
-    const body = document.getElementById('tabella-body');
-    document.getElementById('stat-totale').textContent = dati.length;
-
-    const countGiorno = (g) => dati.filter(d => d.disponibilita[g]).length;
-    document.getElementById('stat-lun').textContent = countGiorno('Lunedì');
-    document.getElementById('stat-sab').textContent = countGiorno('Sabato');
-    document.getElementById('stat-dom').textContent = countGiorno('Domenica');
-
-    if (!dati.length) {
-      body.innerHTML = '<tr><td colspan="9" class="empty-state">Nessuna disponibilità ricevuta ancora.</td></tr>';
-      return;
-    }
-
-    body.innerHTML = dati.map(d => {
-      const celle = GIORNI.map(g => {
-        const o = d.disponibilita[g];
-        return `<td>${o ? `<span class="orario-tag">${o}</span>` : '<span class="no-data">—</span>'}</td>`;
-      }).join('');
-      return `<tr><td>${d.nome}</td>${celle}<td style="color:var(--text-muted);font-size:0.75rem">${d.timestamp}</td></tr>`;
-    }).join('');
-  }
-
-  function svuotaDati() {
-    if (!confirm('Sei sicuro? Verranno cancellate tutte le disponibilità ricevute.')) return;
-    localStorage.removeItem(STORAGE_KEY);
-    aggiornaTabella();
-  }
-
-  // ---- EXPORT EXCEL ----
-  function esportaExcel() {
-    const dati = getDati();
-    if (!dati.length) { alert('Nessun dato da esportare.'); return; }
-
-    let csv = 'Nome,' + GIORNI.join(',') + ',Inviato\n';
-    dati.forEach(d => {
-      const row = [d.nome, ...GIORNI.map(g => d.disponibilita[g] || ''), d.timestamp];
-      csv += row.map(v => `"${v}"`).join(',') + '\n';
-    });
-
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `disponibilita_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ---- INIT ----
-  function init() {
-    document.getElementById('week-label').textContent = getNextWeekLabel();
-    document.getElementById('form-screen').style.display = 'none';
-    document.getElementById('closed-screen').style.display = 'none';
-    document.getElementById('success-screen').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'none';
-
-    if (isFormAperto()) {
-      document.getElementById('form-screen').style.display = 'block';
-      buildGiorniForm();
-    } else {
-      document.getElementById('closed-screen').style.display = 'flex';
-    }
-  }
-
-  init();
-</script>
-</body>
-</html>
+    document.getElementById('closed-screen').s
