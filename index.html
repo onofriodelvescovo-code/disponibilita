@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disponibilità Settimanale — Hotel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --cream: #F5F0E8;
+    --dark: #1A1A18;
+    --gold: #C9A84C;
+    --gold-light: #E8D5A0;
+    --green: #2D5016;
+    --green-light: #4A7C2B;
+    --red: #8B2020;
+    --white: #FDFCF9;
+    --border: #D4C9B0;
+    --text-muted: #7A7060;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    min-height: 100vh;
+    color: var(--dark);
+  }
+
+  /* HEADER */
+  header {
+    background: var(--dark);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 {
+    font-family: 'DM Serif Display', serif;
+    color: var(--gold);
+    font-size: 1.3rem;
+    letter-spacing: 0.02em;
+  }
+
+  header span {
+    font-size: 0.75rem;
+    color: #888;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* DEADLINE BANNER */
+  #deadline-banner {
+    background: var(--gold);
+    color: var(--dark);
+    text-align: center;
+    padding: 10px 24px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  /* CLOSED SCREEN */
+  #closed-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    text-align: center;
+    padding: 40px 24px;
+  }
+
+  #closed-screen .icon { font-size: 3rem; margin-bottom: 16px; }
+  #closed-screen h2 { font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 12px; }
+  #closed-screen p { color: var(--text-muted); max-width: 320px; line-height: 1.6; }
+
+  /* MAIN FORM */
+  #form-screen {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.6rem;
+    margin-bottom: 6px;
+  }
+
+  .section-subtitle {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  /* INPUT NOME */
+  .field-group {
+    margin-bottom: 28px;
+  }
+
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    color: var(--dark);
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--gold);
+  }
+
+  /* GIORNI */
+  .giorni-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .giorno-row {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .giorno-row.attivo {
+    border-color: var(--gold);
+    box-shadow: 0 2px 12px rgba(201, 168, 76, 0.15);
+  }
+
+  .giorno-header {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+    gap: 14px;
+  }
+
+  .giorno-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s;
+    font-size: 13px;
+    color: white;
+  }
+
+  .giorno-row.attivo .giorno-check {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+
+  .giorno-nome {
+    font-weight: 600;
+    font-size: 0.95rem;
+    flex: 1;
+  }
+
+  .giorno-badge {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .giorno-row.attivo .giorno-badge {
+    color: var(--gold);
+  }
+
+  .giorno-orario {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
+    padding-top: 14px;
+  }
+
+  .giorno-row.attivo .giorno-orario {
+    display: block;
+  }
+
+  .giorno-orario input {
+    font-size: 0.92rem;
+    padding: 11px 14px;
+  }
+
+  .orario-hint {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  /* SUBMIT */
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--dark);
+    color: var(--gold);
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin-top: 32px;
+    transition: background 0.2s, transform 0.1s;
+    letter-spacing: 0.02em;
+  }
+
+  .submit-btn:hover { background: #2d2d2a; }
+  .submit-btn:active { transform: scale(0.99); }
+  .submit-btn:disabled { background: #ccc; color: #999; cursor: not-allowed; }
+
+  /* SUCCESS */
+  #success-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    text-align: center;
+    padding: 40px 24px;
+  }
+
+  #success-screen .checkmark {
+    width: 72px; height: 72px;
+    background: var(--green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    margin-bottom: 24px;
+    animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  #success-screen h2 { font-family: 'DM Serif Display', serif; font-size: 1.8rem; margin-bottom: 10px; }
+  #success-screen p { color: var(--text-muted); line-height: 1.6; max-width: 300px; }
+  #success-screen .name-confirm { color: var(--gold); font-weight: 600; }
+
+  /* ADMIN PANEL */
+  #admin-panel {
+    display: none;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  .admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .admin-header h2 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; }
+
+  .admin-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-secondary {
+    padding: 9px 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: border-color 0.2s;
+  }
+
+  .btn-secondary:hover { border-color: var(--gold); }
+
+  .btn-primary {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--dark);
+    color: var(--gold);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+
+  .btn-primary:hover { background: #333; }
+
+  .btn-danger {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--red);
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  /* STATS */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-card .num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    color: var(--gold);
+  }
+
+  .stat-card .lbl {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+
+  thead tr {
+    background: var(--dark);
+    color: var(--gold);
+  }
+
+  thead th {
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--cream); }
+
+  tbody td {
+    padding: 11px 14px;
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  tbody td:first-child {
+    font-weight: 600;
+    color: var(--dark);
+  }
+
+  .orario-tag {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.78rem;
+    color: var(--dark);
+    display: inline-block;
+  }
+
+  .no-data { color: var(--border); font-size: 0.78rem; }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+
+  /* TOGGLE ADMIN */
+  .admin-link {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .admin-link button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* DEADLINE TOGGLE */
+  .deadline-control {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .deadline-control span { font-size: 0.88rem; }
+  .deadline-control strong { font-weight: 600; }
+
+  .toggle-switch {
+    display: flex;
+    gap: 8px;
+  }
+
+  .toggle-btn {
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn.active-open {
+    background: var(--green);
+    color: white;
+    border-color: var(--green);
+  }
+
+  .toggle-btn.active-closed {
+    background: var(--red);
+    color: white;
+    border-color: var(--red);
+  }
+
+  @media (max-width: 480px) {
+    .section-title { font-size: 1.3rem; }
+    thead th, tbody td { padding: 10px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Disponibilità Settimanale</h1>
+  <span id="week-label">Caricamento...</span>
+</header>
+
+<div id="deadline-banner">📅 Le disponibilità vanno inserite entro <strong>giovedì ore 16:00</strong></div>
+
+<!-- CHIUSO -->
+<div id="closed-screen">
+  <div class="icon">🔒</div>
+  <h2>Raccolta chiusa</h2>
+  <p>La finestra per inserire le disponibilità è terminata.<br>Riapre mercoledì prossimo.</p>
+</div>
+
+<!-- FORM CAMERIERE -->
+<div id="form-screen">
+  <div class="section-title">Inserisci la tua disponibilità</div>
+  <p class="section-subtitle">Seleziona i giorni in cui sei disponibile e indica l'orario per ognuno.</p>
+
+  <div class="field-group">
+    <label>Il tuo nome e cognome</label>
+    <input type="text" id="nome-input" placeholder="es. Marco Rossi" autocomplete="name" />
+  </div>
+
+  <div class="field-group">
+    <label>Giorni disponibili</label>
+    <div class="giorni-grid" id="giorni-grid">
+      <!-- generato da JS -->
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="inviaDisponibilita()">Invia disponibilità →</button>
+
+  <div class="admin-link">
+    <button onclick="mostraAdmin()">Accesso gestione</button>
+  </div>
+</div>
+
+<!-- SUCCESSO -->
+<div id="success-screen">
+  <div class="checkmark">✓</div>
+  <h2>Disponibilità inviata!</h2>
+  <p>Grazie <span class="name-confirm" id="nome-confirm"></span>, le tue disponibilità sono state registrate correttamente.</p>
+</div>
+
+<!-- ADMIN -->
+<div id="admin-panel">
+  <div class="admin-header">
+    <h2>🗂 Gestione Disponibilità</h2>
+    <div class="admin-actions">
+      <button class="btn-secondary" onclick="tornaForm()">← Torna al form</button>
+      <button class="btn-primary" onclick="esportaExcel()">⬇ Esporta Excel</button>
+      <button class="btn-danger" onclick="svuotaDati()">🗑 Svuota tutto</button>
+    </div>
+  </div>
+
+  <!-- Controllo apertura/chiusura -->
+  <div class="deadline-control">
+    <span>Stato raccolta: <strong id="stato-label">—</strong></span>
+    <div class="toggle-switch">
+      <button class="toggle-btn" id="btn-apri" onclick="setStato('aperto')">Apri manualmente</button>
+      <button class="toggle-btn" id="btn-chiudi" onclick="setStato('chiuso')">Chiudi manualmente</button>
+      <button class="toggle-btn" id="btn-auto" onclick="setStato('auto')">Automatico</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="num" id="stat-totale">0</div>
+      <div class="lbl">Risposte ricevute</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-lun">0</div>
+      <div class="lbl">Disponibili Lunedì</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-sab">0</div>
+      <div class="lbl">Disponibili Sabato</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-dom">0</div>
+      <div class="lbl">Disponibili Domenica</div>
+    </div>
+  </div>
+
+  <!-- Tabella -->
+  <div class="table-wrap">
+    <table id="tabella-admin">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Lun</th><th>Mar</th><th>Mer</th><th>Gio</th><th>Ven</th><th>Sab</th><th>Dom</th>
+          <th>Inviato</th>
+        </tr>
+      </thead>
+      <tbody id="tabella-body">
+        <tr><td colspan="9" class="empty-state">Nessuna disponibilità ricevuta ancora.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const GIORNI = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+  const GIORNI_SHORT = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  const STORAGE_KEY = 'disponibilita_hotel';
+  const STATO_KEY = 'stato_raccolta'; // 'auto' | 'aperto' | 'chiuso'
+
+  // ---- STATO ----
+  function getStato() {
+    return localStorage.getItem(STATO_KEY) || 'auto';
+  }
+
+  function isFormAperto() {
+    const stato = getStato();
+    if (stato === 'aperto') return true;
+    if (stato === 'chiuso') return false;
+    // AUTO: aperto merc-giovedì entro le 16:00
+    const now = new Date();
+    const giorno = now.getDay(); // 0=dom,1=lun,...,3=mer,4=gio
+    const ora = now.getHours() + now.getMinutes() / 60;
+    return (giorno === 3 || (giorno === 4 && ora < 16));
+  }
+
+  function setStato(s) {
+    localStorage.setItem(STATO_KEY, s);
+    aggiornaStatoUI();
+  }
+
+  function aggiornaStatoUI() {
+    const s = getStato();
+    const aperto = isFormAperto();
+    document.getElementById('stato-label').textContent = aperto ? '🟢 Aperto' : '🔴 Chiuso';
+    document.getElementById('btn-apri').className = 'toggle-btn' + (s === 'aperto' ? ' active-open' : '');
+    document.getElementById('btn-chiudi').className = 'toggle-btn' + (s === 'chiuso' ? ' active-closed' : '');
+    document.getElementById('btn-auto').className = 'toggle-btn' + (s === 'auto' ? ' active-open' : '');
+  }
+
+  // ---- SETTIMANA ----
+  function getNextWeekLabel() {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysUntilMonday = (dayOfWeek === 0) ? 1 : (8 - dayOfWeek);
+    const nextMon = new Date(now);
+    nextMon.setDate(now.getDate() + daysUntilMonday);
+    const nextSun = new Date(nextMon);
+    nextSun.setDate(nextMon.getDate() + 6);
+    const fmt = (d) => d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+    return `Settimana ${fmt(nextMon)} – ${fmt(nextSun)}`;
+  }
+
+  // ---- BUILD FORM ----
+  function buildGiorniForm() {
+    const grid = document.getElementById('giorni-grid');
+    grid.innerHTML = '';
+    GIORNI.forEach((g, i) => {
+      grid.innerHTML += `
+        <div class="giorno-row" id="row-${i}" onclick="toggleGiorno(${i})">
+          <div class="giorno-header">
+            <div class="giorno-check" id="check-${i}"></div>
+            <span class="giorno-nome">${g}</span>
+            <span class="giorno-badge" id="badge-${i}">non disponibile</span>
+          </div>
+          <div class="giorno-orario" id="orario-${i}" onclick="event.stopPropagation()">
+            <label>Orario di disponibilità</label>
+            <input type="text" id="orario-input-${i}" placeholder="es. 06:30 – 15:00" />
+            <p class="orario-hint">Scrivi liberamente l'orario o le note per questo giorno.</p>
+          </div>
+        </div>`;
+    });
+  }
+
+  function toggleGiorno(i) {
+    const row = document.getElementById(`row-${i}`);
+    const badge = document.getElementById(`badge-${i}`);
+    const check = document.getElementById(`check-${i}`);
+    const active = row.classList.toggle('attivo');
+    badge.textContent = active ? 'disponibile' : 'non disponibile';
+    check.textContent = active ? '✓' : '';
+    if (active) document.getElementById(`orario-input-${i}`).focus();
+  }
+
+  // ---- DATI ----
+  function getDati() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function salvaDato(entry) {
+    const dati = getDati();
+    dati.push(entry);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(dati));
+  }
+
+  // ---- INVIA ----
+  function inviaDisponibilita() {
+    const nome = document.getElementById('nome-input').value.trim();
+    if (!nome) { alert('Per favore inserisci il tuo nome e cognome.'); return; }
+
+    const disponibilita = {};
+    let almeno = false;
+    GIORNI.forEach((g, i) => {
+      if (document.getElementById(`row-${i}`).classList.contains('attivo')) {
+        const orario = document.getElementById(`orario-input-${i}`).value.trim() || '—';
+        disponibilita[g] = orario;
+        almeno = true;
+      }
+    });
+
+    if (!almeno) { alert('Seleziona almeno un giorno disponibile.'); return; }
+
+    const entry = {
+      nome,
+      disponibilita,
+      timestamp: new Date().toLocaleString('it-IT')
+    };
+
+    salvaDato(entry);
+
+    document.getElementById('nome-confirm').textContent = nome;
+    document.getElementById('form-screen').style.display = 'none';
+    const s = document.getElementById('success-screen');
+    s.style.display = 'flex';
+  }
+
+  // ---- ADMIN ----
+  function mostraAdmin() {
+    document.getElementById('form-screen').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('closed-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    aggiornaTabella();
+    aggiornaStatoUI();
+  }
+
+  function tornaForm() {
+    document.getElementById('admin-panel').style.display = 'none';
+    init();
+  }
+
+  function aggiornaTabella() {
+    const dati = getDati();
+    const body = document.getElementById('tabella-body');
+    document.getElementById('stat-totale').textContent = dati.length;
+
+    const countGiorno = (g) => dati.filter(d => d.disponibilita[g]).length;
+    document.getElementById('stat-lun').textContent = countGiorno('Lunedì');
+    document.getElementById('stat-sab').textContent = countGiorno('Sabato');
+    document.getElementById('stat-dom').textContent = countGiorno('Domenica');
+
+    if (!dati.length) {
+      body.innerHTML = '<tr><td colspan="9" class="empty-state">Nessuna disponibilità ricevuta ancora.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = dati.map(d => {
+      const celle = GIORNI.map(g => {
+        const o = d.disponibilita[g];
+        return `<td>${o ? `<span class="orario-tag">${o}</span>` : '<span class="no-data">—</span>'}</td>`;
+      }).join('');
+      return `<tr><td>${d.nome}</td>${celle}<td style="color:var(--text-muted);font-size:0.75rem">${d.timestamp}</td></tr>`;
+    }).join('');
+  }
+
+  function svuotaDati() {
+    if (!confirm('Sei sicuro? Verranno cancellate tutte le disponibilità ricevute.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    aggiornaTabella();
+  }
+
+  // ---- EXPORT EXCEL ----
+  function esportaExcel() {
+    const dati = getDati();
+    if (!dati.length) { alert('Nessun dato da esportare.'); return; }
+
+    let csv = 'Nome,' + GIORNI.join(',') + ',Inviato\n';
+    dati.forEach(d => {
+      const row = [d.nome, ...GIORNI.map(g => d.disponibilita[g] || ''), d.timestamp];
+      csv += row.map(v => `"${v}"`).join(',') + '\n';
+    });
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `disponibilita_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ---- INIT ----
+  function init() {
+    document.getElementById('week-label').textContent = getNextWeekLabel();
+    document.getElementById('form-screen').style.display = 'none';
+    document.getElementById('closed-screen').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'none';
+
+    if (isFormAperto()) {
+      document.getElementById('form-screen').style.display = 'block';
+      buildGiorniForm();
+    } else {
+      document.getElementById('closed-screen').style.display = 'flex';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
