@@ -945,7 +945,6 @@
     drop.style.width = rect.width + 'px';
     drop.style.left = rect.left + 'px';
 
-    // Se c'è spazio sotto mettilo sotto, altrimenti sopra
     if (spazioSotto >= dropH) {
       drop.style.top = (rect.bottom + 4) + 'px';
     } else {
@@ -955,8 +954,20 @@
     drop.classList.add('visible');
     activeDropdown = drop;
 
+    // Blocca scroll pagina
+    document.body.style.overflow = 'hidden';
+
     const selected = drop.querySelector('.selected');
     if (selected) setTimeout(() => selected.scrollIntoView({ block: 'center' }), 10);
+  }
+
+  function chiudiTimePicker() {
+    if (activeDropdown) {
+      activeDropdown.classList.remove('visible');
+      activeDropdown = null;
+    }
+    // Riabilita scroll pagina
+    document.body.style.overflow = '';
   }
 
   function selezionaOrario(giornoIdx, tipo, valore) {
@@ -966,23 +977,19 @@
     btn.classList.add('selezionato');
     btn.dataset.value = valore;
 
-    // Aggiorna selected nel dropdown
     const dropId = `drop-${giornoIdx}-${tipo}`;
     const drop = document.getElementById(dropId);
     drop.querySelectorAll('.time-option').forEach(o => {
       o.classList.toggle('selected', o.dataset.time === valore);
     });
 
-    // Chiudi
-    drop.classList.remove('visible');
-    activeDropdown = null;
+    chiudiTimePicker();
   }
 
   // Chiudi dropdown cliccando fuori
   document.addEventListener('click', (e) => {
     if (activeDropdown && !e.target.closest('.time-picker-btn') && !e.target.closest('.time-dropdown')) {
-      activeDropdown.classList.remove('visible');
-      activeDropdown = null;
+      chiudiTimePicker();
     }
   });
 
