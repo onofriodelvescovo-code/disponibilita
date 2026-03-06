@@ -930,7 +930,6 @@
   let activeDropdown = null;
 
   function apriTimePicker(giornoIdx, tipo, btnEl) {
-    // Chiudi dropdown aperto
     if (activeDropdown) {
       activeDropdown.classList.remove('visible');
       activeDropdown = null;
@@ -939,16 +938,25 @@
     const dropId = `drop-${giornoIdx}-${tipo}`;
     let drop = document.getElementById(dropId);
 
-    // Posiziona il dropdown vicino al bottone
     const rect = btnEl.getBoundingClientRect();
-    drop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    const dropH = 240;
+    const spazioSotto = window.innerHeight - rect.bottom;
+
+    drop.style.width = rect.width + 'px';
     drop.style.left = rect.left + 'px';
+
+    // Se c'è spazio sotto mettilo sotto, altrimenti sopra
+    if (spazioSotto >= dropH) {
+      drop.style.top = (rect.bottom + 4) + 'px';
+    } else {
+      drop.style.top = (rect.top - dropH - 4) + 'px';
+    }
+
     drop.classList.add('visible');
     activeDropdown = drop;
 
-    // Scrolla al valore selezionato
     const selected = drop.querySelector('.selected');
-    if (selected) selected.scrollIntoView({ block: 'center' });
+    if (selected) setTimeout(() => selected.scrollIntoView({ block: 'center' }), 10);
   }
 
   function selezionaOrario(giornoIdx, tipo, valore) {
